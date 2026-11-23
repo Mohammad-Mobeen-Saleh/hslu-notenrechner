@@ -779,16 +779,6 @@ option { color: var(--ink); background: #fff; }
 #cloud-user, #cloud-status { overflow-wrap: anywhere; }
 #cloud-status { margin: 18px 0 0; color: var(--ink-2); }
 
-@media (min-width: 901px) {
-  #noten .content {
-    padding-top: 8px;
-  }
-
-  #noten .account-nav a {
-    min-height: 32px;
-  }
-}
-
 .account-nav a,
 .account-page > a {
   display: inline-flex;
