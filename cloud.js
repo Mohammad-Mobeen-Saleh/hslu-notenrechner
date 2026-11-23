@@ -7,7 +7,7 @@ window.connectGradebook = function ({readGuest, getBook, setBook}) {
     return;
   }
   const client = window.supabase.createClient('https://mbdluhqgyjmshbtehlnq.supabase.co',
-    'sb_publishable_NrIrCpXvrUojIINqnIhPsg_0VLkgSpq', {auth: {storage: sessionStorage}});
+    'sb_publishable_NrIrCpXvrUojIINqnIhPsg_0VLkgSpq', {auth: {persistSession: true, autoRefreshToken: true}});
   let user = null;
   let revision = 0;
   let ready = false;
