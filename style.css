@@ -788,3 +788,8 @@ option { color: var(--ink); background: #fff; }
     min-height: 32px;
   }
 }
+
+.account-nav a,
+.account-page > a {
+  text-decoration: none;
+}
