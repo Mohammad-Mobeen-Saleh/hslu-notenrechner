@@ -766,9 +766,15 @@ option { color: var(--ink); background: #fff; }
   *, *::before, *::after { animation-duration: .01ms !important; transition-duration: .01ms !important; scroll-behavior: auto !important; }
 }
 
-.cloud-panel { padding: 1rem; margin-bottom: 1rem; }
-.cloud-panel summary { cursor: pointer; font-weight: 650; }
-.cloud-panel form, .cloud-panel #cloud-account { display: flex; gap: .7rem; align-items: end; flex-wrap: wrap; margin-top: 1rem; }
-.cloud-panel [hidden] { display: none !important; }
-.cloud-panel label { display: grid; gap: .3rem; max-width: 100%; }
-#cloud-status { margin: .6rem 0 0; overflow-wrap: anywhere; }
+
+.account-nav { display: flex; justify-content: flex-end; }
+.account-nav a, .account-page > a { display: inline-flex; align-items: center; min-height: 44px; color: var(--accent); font-weight: 600; }
+.account-page { display: none; max-width: 520px; margin: 0 auto; padding: clamp(16px, 4vw, 40px); }
+.account-page:target { display: block; }
+.account-page:target ~ .layout { display: none; }
+.cloud-panel { margin-top: 12px; padding: clamp(18px, 4vw, 32px); }
+.cloud-panel h1 { font-size: 2rem; margin: 0 0 20px; letter-spacing: -.04em; }
+.cloud-panel form, #cloud-account { display: grid; gap: 12px; }
+.cloud-panel label { display: grid; gap: 5px; }
+#cloud-user, #cloud-status { overflow-wrap: anywhere; }
+#cloud-status { margin: 18px 0 0; color: var(--ink-2); }

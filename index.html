@@ -12,7 +12,27 @@
   <link rel="stylesheet" href="style.css">
 </head>
 <body>
-  <div class="layout">
+  <main id="konto" class="account-page" aria-labelledby="account-heading">
+    <a href="#noten">‹ Zur Notenübersicht</a>
+    <section class="panel cloud-panel">
+      <h1 id="account-heading" tabindex="-1">Mein Konto</h1>
+        <form id="cloud-login">
+          <label>E-Mail <input id="cloud-email" type="email" required autocomplete="email"></label>
+          <label>Passwort <input id="cloud-password" type="password" required autocomplete="current-password"></label>
+          <button class="btn btn-primary">Anmelden</button>
+          <button type="submit" value="register" class="btn">Registrieren</button>
+        </form>
+        <div id="cloud-account" hidden>
+          <span id="cloud-user"></span>
+          <button id="cloud-refresh" class="btn">Kontostand laden</button>
+          <button id="cloud-import" class="btn" hidden>Lokale Noten übernehmen</button>
+          <button id="cloud-retry" class="btn" hidden>Speichern wiederholen</button>
+          <button id="cloud-exit" class="btn">Abmelden</button>
+        </div>
+        <p id="cloud-status" role="status">Lokaler Modus</p>
+    </section>
+  </main>
+  <div class="layout" id="noten">
     <aside class="sidebar">
       <div class="sidebar-sky" aria-hidden="true">
         <span class="sun"></span>
@@ -40,23 +60,7 @@
     </aside>
 
     <main class="content">
-      <details id="cloud-panel" class="panel cloud-panel">
-        <summary>Konto und Synchronisation</summary>
-        <form id="cloud-login">
-          <label>E-Mail <input id="cloud-email" type="email" required autocomplete="email"></label>
-          <label>Passwort <input id="cloud-password" type="password" required autocomplete="current-password"></label>
-          <button class="btn btn-primary">Anmelden</button>
-          <button type="submit" value="register" class="btn">Registrieren</button>
-        </form>
-        <div id="cloud-account" hidden>
-          <span id="cloud-user"></span>
-          <button id="cloud-refresh" class="btn">Kontostand laden</button>
-          <button id="cloud-import" class="btn" hidden>Lokale Noten übernehmen</button>
-          <button id="cloud-retry" class="btn" hidden>Speichern wiederholen</button>
-          <button id="cloud-exit" class="btn">Abmelden</button>
-        </div>
-        <p id="cloud-status" role="status">Lokaler Modus</p>
-      </details>
+      <nav class="account-nav" aria-label="Benutzerkonto"><a id="cloud-link" href="#konto">Anmelden</a></nav>
       <section class="main-actions">
         <h2>Meine Semester</h2>
         <button class="btn btn-primary" id="addSemesterBtn"><svg class="icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" aria-hidden="true"><path d="M12 5v14M5 12h14"/></svg>Semester erstellen</button>

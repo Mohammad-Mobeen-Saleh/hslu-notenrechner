@@ -1,5 +1,6 @@
 window.connectGradebook = function ({readGuest, getBook, setBook}) {
   const el = id => document.getElementById('cloud-' + id);
+  let returnAfterLogin = false;
   const status = message => { el('status').textContent = message; };
   if (!window.supabase || !window.crypto?.randomUUID) {
     status('Lokaler Modus. Für die Anmeldung HTTPS oder localhost öffnen.');
@@ -51,11 +52,13 @@ window.connectGradebook = function ({readGuest, getBook, setBook}) {
       if (pending) draft();
       else {
         sessionStorage.removeItem(draftKey());
+        el('link').textContent = 'Konto';
         status('Im Konto gespeichert.');
       }
       saved = true;
     } catch (error) {
       if (stamp !== generation) return;
+      el('link').textContent = 'Speicherproblem · Konto';
       el('retry').hidden = false;
       status(error.message?.includes('VERSION_CONFLICT')
         ? 'Ein anderes Gerät hat gespeichert. Dein Entwurf bleibt hier sichtbar. Mit «Kontostand laden» kannst du die Serverversion übernehmen.'
@@ -85,12 +88,16 @@ window.connectGradebook = function ({readGuest, getBook, setBook}) {
       pending = Boolean(local);
       setBook(local?.book ?? remoteBook);
       ready = true;
+      el('link').textContent = 'Konto';
       lock(false);
       el('retry').hidden = !pending;
       el('import').hidden = getBook().semesters.length > 0 || !readGuest().semesters.length;
       status(pending ? 'Lokaler Kontoentwurf wiederhergestellt.' : 'Aktueller Kontostand geladen.');
+      if (returnAfterLogin && location.hash === '#konto') location.replace('#noten');
+      returnAfterLogin = false;
       if (pending) void flush();
     } catch (error) {
+      if (stamp === generation) el('link').textContent = 'Ladeproblem · Konto';
       if (stamp === generation) status('Laden fehlgeschlagen. Bitte supabase-sync.sql ausführen oder die Verbindung prüfen. ' + error.message);
     }
   }
@@ -99,6 +106,7 @@ window.connectGradebook = function ({readGuest, getBook, setBook}) {
     clearTimeout(timer);
     writing = ready = pending = false;
     user = next;
+    el('link').textContent = user ? 'Konto' : 'Anmelden';
     document.querySelectorAll('dialog[open]').forEach(d => d.close());
     el('login').hidden = Boolean(user);
     el('account').hidden = !user;
@@ -117,6 +125,7 @@ window.connectGradebook = function ({readGuest, getBook, setBook}) {
     event.preventDefault();
     const register = event.submitter?.value === 'register';
     const credentials = {email: el('email').value.trim(), password: el('password').value};
+    returnAfterLogin = true;
     el('login').inert = true;
     status(register ? 'Konto wird erstellt …' : 'Anmeldung läuft …');
     try {
@@ -124,8 +133,9 @@ window.connectGradebook = function ({readGuest, getBook, setBook}) {
         : await client.auth.signInWithPassword(credentials);
       if (error) throw error;
       el('password').value = '';
+      if (!data.session) returnAfterLogin = false;
       if (!data.session) status('Bitte bestätige deine E-Mail-Adresse und melde dich danach hier an.');
-    } catch (error) { status(error.message); }
+    } catch (error) { returnAfterLogin = false; status(error.message); }
     finally { el('login').inert = false; }
   };
   el('exit').onclick = async () => {
