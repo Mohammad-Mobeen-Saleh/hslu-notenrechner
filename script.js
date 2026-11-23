@@ -205,11 +205,18 @@
       const semester = findSemester(activeSemesterId);
       if (!semester) return;
       const name = els.customName.value.trim();
+      const code = els.customCode.value.trim();
       if (!name) return;
+
+      const duplicate = findExistingModule({ name, code });
+      if (duplicate) {
+        showToast(`Dieses Modul ist bereits im Semester «${duplicate.semester.name}» erfasst.`);
+        return;
+      }
 
       semester.modules.push(normaliseModule({
         id: uid(),
-        code: els.customCode.value.trim(),
+        code,
         name,
         ects: parseNumber(els.customEcts.value) || 3,
         target: parseFloat(els.customTarget.value),
@@ -805,20 +812,33 @@
     }
 
     const query = els.moduleSearch.value.trim().toLowerCase();
-    const items = library.filter(module => !query ||
-      module.name.toLowerCase().includes(query) || module.code.toLowerCase().includes(query));
+    const matchingItems = library.filter(module =>
+      !query ||
+      module.name.toLowerCase().includes(query) ||
+      module.code.toLowerCase().includes(query)
+    );
+
+    // Bereits in irgendeinem Semester erfasste Katalogmodule werden
+    // vollständig aus der Auswahl entfernt und können nicht erneut hinzugefügt werden.
+    const items = matchingItems.filter(module => !findExistingModule(module));
+
+    let emptyMessage = "";
+    if (items.length === 0) {
+      if (matchingItems.length > 0) {
+        emptyMessage = "Alle passenden Module wurden bereits einem Semester hinzugefügt.";
+      } else {
+        emptyMessage = "Keine passenden Module gefunden. Über «Eigenes Modul» kannst du ein eigenes Modul erfassen.";
+      }
+    }
 
     els.catalogList.innerHTML = items.length
       ? items.map(module => {
-          // Bereits belegte Module bleiben sichtbar, z. B. für eine Wiederholung.
-          const presentIn = state.semesters.filter(s => s.modules.some(m => m.code && m.code === module.code));
           const count = module.assessments.length;
           return `
-            <div class="catalog-item${presentIn.length ? " catalog-item-present" : ""}">
+            <div class="catalog-item">
               <div>
                 <div class="catalog-item-name">${escapeHtml(module.name)}</div>
                 <div class="catalog-item-meta"><span class="module-code">${escapeHtml(module.code)}</span> · ${module.ects ? formatNumber(module.ects) + " ECTS" : "ohne ECTS"} · ${count} ${count === 1 ? "Leistungsnachweis" : "Leistungsnachweise"}</div>
-                ${presentIn.length ? `<div class="catalog-presence">Bereits in ${presentIn.map(s => "«" + escapeHtml(s.name) + "»").join(", ")}</div>` : ""}
               </div>
               <div class="catalog-target">
                 <label class="field-control">
@@ -830,15 +850,20 @@
             </div>
           `;
         }).join("")
-      : `<div class="empty-semester"><p>Keine passenden Module gefunden. Über «Eigenes Modul» kannst du es selbst erfassen.</p></div>`;
+      : `<div class="empty-semester"><p>${escapeHtml(emptyMessage)}</p></div>`;
 
     els.catalogList.querySelectorAll("[data-catalog-add]").forEach(button => {
       button.addEventListener("click", () => {
         const semesterNow = findSemester(activeSemesterId);
         const template = library.find(module => module.code === button.dataset.catalogAdd);
         if (!semesterNow || !template) return;
-        if (semesterNow.modules.some(existing => existing.code === template.code)) {
-          showToast("Dieses Modul ist in diesem Semester bereits vorhanden.");
+
+        // Zusätzliche Prüfung direkt beim Hinzufügen, damit auch ein veralteter
+        // Dialog oder eine schnelle Mehrfachaktion keine Dublette erzeugt.
+        const duplicate = findExistingModule(template);
+        if (duplicate) {
+          showToast(`Dieses Modul ist bereits im Semester «${duplicate.semester.name}» erfasst.`);
+          renderCatalog();
           return;
         }
 
@@ -860,6 +885,28 @@
         showToast(weightSum === 100 ? "Modul hinzugefügt." : "Modul hinzugefügt. Bitte die Gewichtungen prüfen.");
       });
     });
+  }
+
+  function normaliseModuleIdentity(value) {
+    return String(value || "").trim().toLocaleLowerCase("de-CH");
+  }
+
+  function moduleIdentityMatches(existing, candidate) {
+    const existingCode = normaliseModuleIdentity(existing.code);
+    const candidateCode = normaliseModuleIdentity(candidate.code);
+
+    // Sind beide Modulnummern vorhanden, ist die Modulnummer massgebend.
+    // Bei eigenen Modulen ohne Modulnummer vergleichen wir den Modulnamen.
+    if (existingCode && candidateCode) return existingCode === candidateCode;
+    return normaliseModuleIdentity(existing.name) === normaliseModuleIdentity(candidate.name);
+  }
+
+  function findExistingModule(candidate) {
+    for (const semester of state.semesters) {
+      const module = semester.modules.find(existing => moduleIdentityMatches(existing, candidate));
+      if (module) return { semester, module };
+    }
+    return null;
   }
 
   function calculateModule(module) {
