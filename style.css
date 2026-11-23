@@ -810,3 +810,9 @@ option { color: var(--ink); background: #fff; }
     transform: translateY(-8px);
   }
 }
+
+/* Mobile: Anmelden/Konto ganz oben, über der Seitenleiste */
+@media (max-width: 900px) {
+  .layout { position: relative; padding-top: 60px; }
+  .account-nav { position: absolute; top: 14px; right: 12px; left: 12px; }
+}

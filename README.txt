@@ -13,14 +13,15 @@ Supabase einrichten
 3. Unter «Konto und Synchronisation» registrieren. Falls eine Bestätigung
    verlangt wird, den Link in der E-Mail öffnen und danach im Rechner anmelden.
 4. Auf dem zweiten Gerät die veröffentlichte HTTPS-Adresse öffnen, mit demselben
-   Konto anmelden und «Kontostand laden» wählen, um neue Änderungen zu sehen.
+   Konto anmelden. Der aktuelle Kontostand wird beim Anmelden automatisch geladen.
 5. Bestehende lokale Semester erscheinen im Gastmodus derselben Browseradresse.
    Im leeren Konto «Lokale Noten übernehmen» wählen. Die lokale Kopie bleibt
    erhalten. Für den Umzug von einer alten file-Adresse kann die neue Fassung
    am gleichen Dateipfad geöffnet werden, sofern der Browser dort Konten zulässt.
 6. Bei gleichzeitigem Bearbeiten schützt eine Versionsprüfung den gespeicherten
-   Stand. Bei einem Konflikt die eigenen Änderungen ablesen, den Kontostand
-   laden und die gewünschten Werte erneut eintragen. Bei Netzfehlern bleibt
+   Stand. Bei einem Konflikt lädt der Rechner automatisch den aktuellen
+   Kontostand; die letzte Änderung danach prüfen und falls nötig erneut
+   eintragen. Bei Netzfehlern bleibt
    der Kontoentwurf in diesem Tab. Vor dem Schliessen «Im Konto gespeichert»
    abwarten. Das Konto verwendet eine tabbezogene Sitzung.
 

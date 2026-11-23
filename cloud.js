@@ -41,6 +41,7 @@ window.connectGradebook = function ({readGuest, getBook, setBook}) {
     writing = true;
     el('retry').hidden = true;
     let saved = false;
+    let conflict = false;
     try {
       const {data,error} = await client.rpc('save_gradebook', {
         expected_revision: revision, book: structuredClone(getBook())
@@ -59,18 +60,22 @@ window.connectGradebook = function ({readGuest, getBook, setBook}) {
     } catch (error) {
       if (stamp !== generation) return;
       el('link').textContent = 'Speicherproblem · Konto';
-      el('retry').hidden = false;
-      status(error.message?.includes('VERSION_CONFLICT')
-        ? 'Ein anderes Gerät hat gespeichert. Dein Entwurf bleibt hier sichtbar. Mit «Kontostand laden» kannst du die Serverversion übernehmen.'
-        : 'Speichern fehlgeschlagen. Bitte Verbindung prüfen und erneut speichern. ' + error.message);
+      if (error.message?.includes('VERSION_CONFLICT')) {
+        // Ein anderes Gerät hat zwischenzeitlich gespeichert: aktuellen Kontostand übernehmen.
+        conflict = true;
+      } else {
+        el('retry').hidden = false;
+        status('Speichern fehlgeschlagen. Bitte Verbindung prüfen und erneut speichern. ' + error.message);
+      }
     } finally {
       if (stamp === generation) {
         writing = false;
         if (saved && pending) void flush();
+        if (conflict) await load(true, 'Ein anderes Gerät hat zwischenzeitlich gespeichert. Der aktuelle Kontostand wurde geladen. Bitte deine letzte Änderung prüfen.');
       }
     }
   }
-  async function load(discard = false) {
+  async function load(discard = false, message = '') {
     if (!user || writing) return;
     const stamp = ++generation;
     clearTimeout(timer);
@@ -92,7 +97,8 @@ window.connectGradebook = function ({readGuest, getBook, setBook}) {
       lock(false);
       el('retry').hidden = !pending;
       el('import').hidden = getBook().semesters.length > 0 || !readGuest().semesters.length;
-      status(pending ? 'Lokaler Kontoentwurf wiederhergestellt.' : 'Aktueller Kontostand geladen.');
+      status(message || (pending ? 'Lokaler Kontoentwurf wiederhergestellt.' : 'Aktueller Kontostand geladen.'));
+      if (message) el('link').textContent = 'Hinweis · Konto';
       if (returnAfterLogin && location.hash === '#konto') location.replace('#noten');
       returnAfterLogin = false;
       if (pending) void flush();
@@ -143,11 +149,6 @@ window.connectGradebook = function ({readGuest, getBook, setBook}) {
     if (pending && !confirm('Ungespeicherte Änderungen bleiben in diesem Tab als Kontoentwurf. Jetzt abmelden?')) return;
     const {error} = await client.auth.signOut({scope:'local'});
     if (error) status(error.message);
-  };
-  el('refresh').onclick = () => {
-    if (writing) { status('Speichern läuft. Bitte kurz warten.'); return; }
-    if (pending && !confirm('Den lokalen Kontoentwurf verwerfen und den gespeicherten Stand laden?')) return;
-    void load(pending);
   };
   el('retry').onclick = flush;
   el('import').onclick = () => {
