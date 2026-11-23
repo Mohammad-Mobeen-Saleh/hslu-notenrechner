@@ -24,14 +24,13 @@ Supabase einrichten
    der Kontoentwurf in diesem Tab. Vor dem Schliessen «Im Konto gespeichert»
    abwarten. Das Konto verwendet eine tabbezogene Sitzung.
 
-Start mit optionalem HSLU-Katalogdienst
----------------------------------------
-Für den HSLU-Livekatalog Python 3 installieren und im entpackten Projektordner
-unter Windows «py server.py» oder unter macOS/Linux «python3 server.py» starten.
-Im Browser http://localhost:8000 öffnen. Zum Beenden im Terminal Ctrl+C drücken.
-Beim direkten Öffnen der index.html steht der mitgelieferte Katalog zur Verfügung.
-Der Browser speichert Noten pro Adresse. Frühere Eingaben unter einer anderen
-Adresse sind dort weiterhin abrufbar.
+Lokaler Start
+-------------
+Python 3 installieren und im Projektordner unter Windows «py server.py» oder
+unter macOS/Linux «python3 server.py» starten. Im Browser http://localhost:8000
+öffnen. Zum Beenden im Terminal Ctrl+C drücken. Die Kontofunktionen brauchen
+localhost oder HTTPS. Beim direkten Öffnen der index.html funktioniert nur der
+Gastmodus. Der Browser speichert Noten pro Adresse.
 
 Speicherung
 -----------
@@ -40,17 +39,23 @@ Ein Neuladen der Seite löscht die Eingaben nicht.
 
 Modulkatalog
 ------------
-Öffnen, Suchen und «Katalog aktualisieren» fragen das HSLU-Verzeichnis neu ab.
-Weitere Treffer lassen sich seitenweise laden. Beim Hinzufügen ruft der Rechner
-die Moduldetails ab. Fehlende Gewichtungen erscheinen mit 0 und sind editierbar.
-Bereits hinzugefügte Module sind persönliche Semesterkopien.
-Die lokale API bietet GET /api/modules?q=DAPRAD&field=modulnummer&offset=0
-und GET /api/modules/{id}. Für die Namenssuche lautet field=modulname.
-Ein HSLU-Ausfall wird im Modulkatalog angezeigt.
+Der Katalog in modules.js enthält alle Module des Studiengangs BSc
+Wirtschaftsinformatik aus dem HSLU-Modulverzeichnis (Stand November 2026)
+sowie die Arabisch-Sprachmodule, jeweils mit ECTS, Leistungsnachweisen und
+Gewichtungen. Die Suche filtert nach Modulname und Modulnummer.
+Bereits belegte Module bleiben sichtbar und zeigen an, in welchem Semester
+sie vorkommen (z. B. für eine Wiederholung). Hinzugefügte Module sind
+persönliche Kopien und lassen sich frei anpassen. Eigene Module können über
+«Eigenes Modul» erfasst werden.
 
-Der mitgelieferte Modulkatalog enthält die bisher erfassten Module sowie die neu ergänzten HSLU Module aus den bereitgestellten Modulbeschrieben.
-Die Leistungsnachweise und Gewichtungen sind in modules.js hinterlegt.
-Eigene Module und zusätzliche Leistungsnachweise können weiterhin manuell ergänzt werden.
+Berechnung
+----------
+Modulnote: gewichteter Durchschnitt der Leistungsnachweise, auf halbe Noten
+gerundet. Ergeben die Gewichtungen nicht 100 %, wird anteilig gerechnet und
+ein Hinweis angezeigt.
+Semester- und Gesamtschnitt: Durchschnitt der gerundeten Modulnoten aller
+abgeschlossenen Module, gewichtet nach ECTS. Offene Module und Module ohne
+ECTS zählen nicht.
 
 Hinweis
 -------

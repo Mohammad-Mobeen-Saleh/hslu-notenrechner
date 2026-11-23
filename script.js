@@ -4,66 +4,9 @@
   const STORAGE_KEY = "hslu-wi-notenrechner-v1";
   const SCHEMA_VERSION = 2;
   const DEFAULT_TARGET = 5.0;
-  const offlineLibrary = Array.isArray(window.HSLU_MODULE_LIBRARY) ? window.HSLU_MODULE_LIBRARY : [];
-
-  let library = offlineLibrary;
-  let revision = 0;
-  let timer;
-  let nextFields = [];
-  let offset = 0;
-  const status = document.getElementById("catalogStatus");
-  const more = document.getElementById("moreCatalog");
-
-  function scheduleCatalogue(delay = 0) {
-    const request = ++revision;
-    clearTimeout(timer);
-    library = offlineLibrary;
-    nextFields = [];
-    offset = 0;
-    more.hidden = true;
-    renderCatalog();
-    if (location.protocol === "file:") {
-      status.textContent = "Lokaler Katalog. Für HSLU-Daten den Rechner mit server.py starten.";
-      return;
-    }
-    status.textContent = "HSLU-Katalog wird abgerufen …";
-    timer = setTimeout(() => loadCatalogue(request), delay);
-  }
-
-  async function api(path) {
-    const response = await fetch(path, {cache: "no-store", signal: AbortSignal.timeout(16000)});
-    if (!response.ok) throw new Error("HSLU-Abruf fehlgeschlagen");
-    return response.json();
-  }
-
-  async function loadCatalogue(request) {
-    const query = els.moduleSearch.value.trim();
-    const fields = offset ? nextFields : query ? ["modulname", "modulnummer"] : ["modulname"];
-    more.disabled = true;
-    try {
-      const pages = await Promise.all(fields.map(field =>
-        api("api/modules?" + new URLSearchParams({q: query, field, offset}))));
-      if (request !== revision) return;
-      const byId = new Map((offset ? library : []).map(row => [row.remoteId, row]));
-      for (const row of pages.flat()) {
-        if (!row.modulnummer || !/^\d+$/.test(row.id)) continue;
-        byId.set(row.id, {remoteId: row.id, code: row.modulnummer, name: row.modulname,
-          ects: Number(String(row.credits ?? "").replace(",", ".")), assessments: []});
-      }
-      library = [...byId.values()];
-      nextFields = fields.filter((field, i) => pages[i].length === 30);
-      offset += 30;
-      more.hidden = !nextFields.length;
-      status.textContent = "HSLU-Katalog abgerufen um " + new Date().toLocaleTimeString("de-CH") + ".";
-      renderCatalog();
-    } catch {
-      if (request !== revision) return;
-      status.textContent = offset ? "Weitere HSLU-Module konnten nicht geladen werden." :
-        "HSLU-Abruf fehlgeschlagen. Du siehst den mitgelieferten Katalog.";
-    } finally {
-      if (request === revision) more.disabled = false;
-    }
-  }
+  // Fester Modulkatalog aus modules.js, alphabetisch sortiert.
+  const library = (Array.isArray(window.HSLU_MODULE_LIBRARY) ? [...window.HSLU_MODULE_LIBRARY] : [])
+    .sort((a, b) => a.name.localeCompare(b.name, "de-CH") || a.code.localeCompare(b.code));
 
   // Inline-SVG-Icons (rein dekorativ, Beschriftungen bleiben unverändert).
   const svg = (body, extra = "") => `<svg class="icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" focusable="false"${extra}>${body}</svg>`;
@@ -202,7 +145,7 @@
       id: module.id || uid(),
       code: String(module.code || ""),
       name: String(module.name || "Unbenanntes Modul").trim() || "Unbenanntes Modul",
-      ects: clampNumber(module.ects, 0.5, 60, 3),
+      ects: clampNumber(module.ects, 0, 60, 3),
       target: normaliseHalfGrade(module.target ?? DEFAULT_TARGET),
       source: module.source || "custom",
       expanded: Boolean(module.expanded),
@@ -255,9 +198,7 @@
       button.addEventListener("click", () => switchTab(button.dataset.tab));
     });
 
-    els.moduleSearch.addEventListener("input", () => scheduleCatalogue(350));
-    document.getElementById("refreshCatalog").onclick = () => scheduleCatalogue();
-    more.onclick = () => loadCatalogue(revision);
+    els.moduleSearch.addEventListener("input", renderCatalog);
 
     els.customTab.addEventListener("submit", event => {
       event.preventDefault();
@@ -335,8 +276,9 @@
     els.moduleSearch.value = "";
     resetCustomModuleForm();
     switchTab("catalog");
-    scheduleCatalogue();
+    renderCatalog();
     els.moduleDialog.showModal();
+    setTimeout(() => els.moduleSearch.focus(), 30);
   }
 
   function resetCustomModuleForm() {
@@ -359,9 +301,8 @@
   }
 
   function renderStudyAverage() {
-    const semesterAverages = state.semesters
-      .map(calculateSemesterAverage)
-      .filter(average => average != null);
+    const allModules = state.semesters.flatMap(semester => semester.modules);
+    const avg = weightedAverage(allModules);
 
     const moduleTotal = state.semesters.reduce((sum, semester) => sum + semester.modules.length, 0);
     const ectsTotal = state.semesters.reduce((sum, semester) => sum + semester.modules.reduce((s, module) => s + module.ects, 0), 0);
@@ -371,19 +312,17 @@
       ["ECTS", formatNumber(ectsTotal)]
     ].map(([label, value]) => `<div class="hero-stat"><span>${label}</span><strong>${value}</strong></div>`).join("");
 
-    if (!semesterAverages.length) {
+    if (avg == null) {
       els.studyAverage.innerHTML = `<span class="study-average-label">aktueller Schnitt</span><span class="study-average-empty">Noch keine abgeschlossenen Module</span>`;
       return;
     }
 
-    const avg = semesterAverages.reduce((sum, semesterAverage) => sum + semesterAverage, 0) / semesterAverages.length;
     const reached = avg >= rawThresholdForTarget(state.studyTarget);
     els.studyAverage.innerHTML = `<span class="study-average-label">aktueller Schnitt</span><strong class="study-average-value${reached ? " is-reached" : ""}">${formatUnroundedGrade(avg)}</strong>`;
   }
 
   function renderSemesterHtml(semester, index = 0) {
-    // Der Semesterschnitt wird aus den gerundeten Modulendnoten berechnet.
-    // Einzelne Leistungsnachweise werden nicht separat berücksichtigt.
+    // Der Semesterschnitt wird aus den gerundeten Modulnoten berechnet (ECTS-gewichtet).
     const semesterAvg = calculateSemesterAverage(semester);
     const semesterEcts = semester.modules.reduce((sum, module) => sum + module.ects, 0);
 
@@ -430,15 +369,22 @@
   }
 
   function calculateSemesterAverage(semester) {
-    // Jedes abgeschlossene Modul zählt gleich stark. Einzelne
-    // Leistungsnachweise fliessen nur über die gerundete Modulendnote ein.
-    const moduleAverages = semester.modules
-      .map(module => calculateModule(module))
-      .map(calc => calc.rounded)
-      .filter(average => average != null);
+    return weightedAverage(semester.modules);
+  }
 
-    if (!moduleAverages.length) return null;
-    return moduleAverages.reduce((sum, average) => sum + average, 0) / moduleAverages.length;
+  // Schnitt über abgeschlossene Module, gewichtet nach ECTS.
+  // Jedes Modul fliesst mit seiner auf halbe Noten gerundeten Modulnote ein.
+  // Noch offene Module und Module ohne ECTS zählen nicht.
+  function weightedAverage(modules) {
+    let ectsSum = 0;
+    let gradeSum = 0;
+    for (const module of modules) {
+      const calc = calculateModule(module);
+      if (!calc.complete || !(module.ects > 0)) continue;
+      ectsSum += module.ects;
+      gradeSum += calc.rounded * module.ects;
+    }
+    return ectsSum > 0 ? gradeSum / ectsSum : null;
   }
 
   function renderModuleHtml(semester, module) {
@@ -472,7 +418,7 @@
             </label>
             <label>
               <span>ECTS</span>
-              <input data-module-ects="${module.id}" data-semester="${semester.id}" type="number" min="0.5" max="60" step="0.5" value="${formatNumber(module.ects)}">
+              <input data-module-ects="${module.id}" data-semester="${semester.id}" type="number" min="0" max="60" step="0.5" value="${formatNumber(module.ects)}">
             </label>
             <label>
               <span>Wunschmodulnote</span>
@@ -508,9 +454,16 @@
     }
 
     if (calc.totalWeight <= 0) {
-      return `<div class="goal-box warning">Die Gewichtungen müssen zusammen einen sinnvollen Wert ergeben</div>`;
+      return `<div class="goal-box warning">Bitte trage die Gewichtungen der Leistungsnachweise ein (zusammen 100 %)</div>`;
     }
 
+    const weightHint = Math.abs(calc.totalWeight - 100) > 0.001
+      ? `<div class="goal-box warning">Die Gewichtungen ergeben zusammen ${formatNumber(Math.round(calc.totalWeight * 100) / 100)} % statt 100 %. Die Note wird anteilig berechnet.</div>`
+      : "";
+    return weightHint + renderGoalMessage(module, calc, threshold);
+  }
+
+  function renderGoalMessage(module, calc, threshold) {
     if (calc.complete) {
       const reached = calc.raw >= threshold;
       const className = reached ? "success" : "danger";
@@ -641,7 +594,7 @@
       input.addEventListener("change", () => {
         const module = findModule(input.dataset.semester, input.dataset.moduleEcts);
         if (!module) return;
-        module.ects = clampNumber(parseNumber(input.value), 0.5, 60, module.ects);
+        module.ects = clampNumber(parseNumber(input.value), 0, 60, module.ects);
         saveState();
         render();
       });
@@ -852,88 +805,59 @@
     }
 
     const query = els.moduleSearch.value.trim().toLowerCase();
-    const items = library.filter(module => {
-      const alreadyAdded = state.semesters.some(candidateSemester =>
-        candidateSemester.modules.some(existing => existing.code && existing.code === module.code)
-      );
-      if (alreadyAdded) return false;
-      if (module.remoteId || !query) return true;
-      return module.name.toLowerCase().includes(query) || module.code.toLowerCase().includes(query);
-    });
+    const items = library.filter(module => !query ||
+      module.name.toLowerCase().includes(query) || module.code.toLowerCase().includes(query));
 
     els.catalogList.innerHTML = items.length
       ? items.map(module => {
+          // Bereits belegte Module bleiben sichtbar, z. B. für eine Wiederholung.
+          const presentIn = state.semesters.filter(s => s.modules.some(m => m.code && m.code === module.code));
+          const count = module.assessments.length;
           return `
-            <div class="catalog-item">
+            <div class="catalog-item${presentIn.length ? " catalog-item-present" : ""}">
               <div>
                 <div class="catalog-item-name">${escapeHtml(module.name)}</div>
-                <div class="catalog-item-meta"><span class="module-code">${escapeHtml(module.code)}</span> · ${module.ects ? formatNumber(module.ects) + " ECTS" : "ECTS individuell"} · ${module.remoteId ? `<a href="https://modulverzeichnis.hslu.ch/module/${module.remoteId}" target="_blank" rel="noopener">Modulbeschrieb</a>` : module.assessments.length + " Leistungsnachweis(e)"}</div>
+                <div class="catalog-item-meta"><span class="module-code">${escapeHtml(module.code)}</span> · ${module.ects ? formatNumber(module.ects) + " ECTS" : "ohne ECTS"} · ${count} ${count === 1 ? "Leistungsnachweis" : "Leistungsnachweise"}</div>
+                ${presentIn.length ? `<div class="catalog-presence">Bereits in ${presentIn.map(s => "«" + escapeHtml(s.name) + "»").join(", ")}</div>` : ""}
               </div>
               <div class="catalog-target">
                 <label class="field-control">
                   <span>Wunsch</span>
-                  <select data-catalog-target="${escapeAttr(module.remoteId ? "id:" + module.remoteId : module.code)}">${targetOptionsHtml(DEFAULT_TARGET)}</select>
+                  <select data-catalog-target="${escapeAttr(module.code)}">${targetOptionsHtml(DEFAULT_TARGET)}</select>
                 </label>
-                <button class="btn btn-primary btn-small" data-catalog-add="${escapeAttr(module.remoteId ? "id:" + module.remoteId : module.code)}" type="button">${ICON.plus}Hinzufügen</button>
+                <button class="btn btn-primary btn-small" data-catalog-add="${escapeAttr(module.code)}" type="button">${ICON.plus}Hinzufügen</button>
               </div>
             </div>
           `;
         }).join("")
-      : `<div class="empty-semester"><p>${query ? "Keine passenden Module gefunden." : "Alle Katalogmodule wurden bereits hinzugefügt."}</p></div>`;
+      : `<div class="empty-semester"><p>Keine passenden Module gefunden. Über «Eigenes Modul» kannst du es selbst erfassen.</p></div>`;
 
     els.catalogList.querySelectorAll("[data-catalog-add]").forEach(button => {
-      button.addEventListener("click", async () => {
+      button.addEventListener("click", () => {
         const semesterNow = findSemester(activeSemesterId);
-        const template = library.find(module => (module.remoteId ? "id:" + module.remoteId : module.code) === button.dataset.catalogAdd);
+        const template = library.find(module => module.code === button.dataset.catalogAdd);
         if (!semesterNow || !template) return;
-        const alreadyAdded = state.semesters.some(candidateSemester =>
-          candidateSemester.modules.some(existing => existing.code && existing.code === template.code)
-        );
-        if (alreadyAdded) {
-          renderCatalog();
+        if (semesterNow.modules.some(existing => existing.code === template.code)) {
+          showToast("Dieses Modul ist in diesem Semester bereits vorhanden.");
           return;
         }
 
-        const targetSelect = els.catalogList.querySelector(`[data-catalog-target="${cssEscape(button.dataset.catalogAdd)}"]`);
-        let assessments = template.assessments;
-        let ects = template.ects;
-        if (template.remoteId) {
-          button.disabled = true;
-          try {
-            const detail = await api("api/modules/" + template.remoteId);
-            if (!button.isConnected || !els.moduleDialog.open || !els.catalogList.contains(button) ||
-                semesterNow !== findSemester(activeSemesterId)) return;
-            if (detail.modulnummer !== template.code) throw new Error("Modulnummer passt nicht");
-            const elements = detail.leistungsnachweisGroup?.leistungsnachweisElements ?? [];
-            assessments = elements.map((item, i) => ({
-              name: [item.art, item.form].filter(Boolean).join(" / ") || "Leistungsnachweis " + (i + 1),
-              weight: Number(String(item.gewichtungProzent ?? 0).replace(",", "."))
-            }));
-            if (!(ects >= 0.5 && ects <= 60)) {
-              const input = prompt("Wie viele ECTS belegst du für dieses Modul?");
-              if (input === null) return;
-              ects = Number(input.replace(",", "."));
-              if (!(ects >= 0.5 && ects <= 60)) { showToast("Bitte gültige ECTS eingeben."); return; }
-            }
-          } catch {
-            showToast("Moduldetails konnten nicht abgerufen werden. Bitte erneut versuchen.");
-            return;
-          } finally { button.disabled = false; }
-        }
+        const targetSelect = els.catalogList.querySelector(`[data-catalog-target="${cssEscape(template.code)}"]`);
         semesterNow.modules.push(normaliseModule({
           id: uid(),
           code: template.code,
           name: template.name,
-          ects,
+          ects: template.ects,
           target: parseFloat(targetSelect?.value || DEFAULT_TARGET),
           source: "catalog",
-          assessments: assessments.map(a => ({ id: uid(), name: a.name, weight: a.weight, grade: null }))
+          assessments: template.assessments.map(a => ({ id: uid(), name: a.name, weight: a.weight, grade: null }))
         }));
 
         saveState();
         els.moduleDialog.close();
         render();
-        showToast(template.remoteId && (!assessments.length || assessments.some(a => !a.weight)) ? "Modul hinzugefügt. Bitte Leistungsnachweise und offene Gewichtungen prüfen." : "Modul hinzugefügt.");
+        const weightSum = template.assessments.reduce((sum, a) => sum + Number(a.weight || 0), 0);
+        showToast(weightSum === 100 ? "Modul hinzugefügt." : "Modul hinzugefügt. Bitte die Gewichtungen prüfen.");
       });
     });
   }
@@ -947,7 +871,7 @@
     const knownWeight = known.reduce((sum, a) => sum + Number(a.weight || 0), 0);
     const raw = totalWeight > 0 && open.length === 0 ? knownWeightedSum / totalWeight : null;
     const partialRaw = knownWeight > 0 ? knownWeightedSum / knownWeight : null;
-    const rounded = raw == null ? (partialRaw == null ? null : roundHalf(partialRaw)) : roundHalf(raw);
+    const rounded = raw == null ? null : roundHalf(raw);
 
     return {
       totalWeight,
@@ -1063,7 +987,7 @@
 
   function formatNumber(value) {
     const n = Number(value);
-    return Number.isInteger(n) ? String(n) : String(n).replace(".", ".");
+    return String(n);
   }
 
   function uid() {
