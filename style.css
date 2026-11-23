@@ -791,5 +791,26 @@ option { color: var(--ink); background: #fff; }
 
 .account-nav a,
 .account-page > a {
+  display: inline-flex;
+  align-items: center;
+  min-height: 32px;
+  padding: 4px 12px;
+  border: 1px solid var(--accent-line);
+  border-radius: 10px;
+  background: var(--surface-2);
+  color: var(--accent);
+  font-weight: 600;
   text-decoration: none;
+}
+
+.account-nav a:hover,
+.account-page > a:hover {
+  background: var(--accent-soft);
+  border-color: var(--accent);
+}
+
+.account-nav a:focus-visible,
+.account-page > a:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 3px;
 }
