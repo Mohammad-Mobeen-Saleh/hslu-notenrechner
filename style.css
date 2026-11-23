@@ -804,3 +804,9 @@ option { color: var(--ink); background: #fff; }
   outline: 2px solid var(--accent);
   outline-offset: 3px;
 }
+
+@media (min-width: 901px) {
+  #cloud-link {
+    transform: translateY(-8px);
+  }
+}
